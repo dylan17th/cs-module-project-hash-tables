@@ -9,47 +9,71 @@ class HashTableEntry:
 
     def __repr__(self):
         return f"({self.key}, {self.value}, {self.next})"
-# Hash table can't have fewer than this many slots
-MIN_CAPACITY = 8
+
+
 class LinkedList:
     def __init__(self):
-        self.head: None
+        self.head = None
+        self.tail = None
 
-    def contains(self, key):
+    def contains(self, key): 
         current = self.head
-
         while current is not None: 
             if current.key == key:
                 return current
             current = current.next
-
         return current
 
     def upsert(self, key, value):
         new_node = HashTableEntry(key,value)
-        if self.contains(key) == None: 
+        if self.contains(key) is not None:
+            self.contains(key).value = value
+        elif self.head: 
             new_node.next = self.head
             self.head = new_node
-        self.contains(key).value = value
+        elif self.head is self.tail and self.head is None:
+            self.tail = new_node
+            self.head = new_node
+
+    def __repr__(self):
+        return f"{self.head}"
+
+    def delete(self, key):
+        if self.contains(key) is not None: 
+            if self.head is self.tail:
+                self.head = None
+                self.tail = None
+            elif self.head.key == self.contains(key).key:
+                self.head = self.head.next
+            elif self.tail is self.contains(key):
+                self.tail = self.get_prev_node(self.contains(key))
+                self.tail.next = None
+            else:
+                self.get_prev_node(self.contains(key)).next = self.contains(key).next
+
+    def get_prev_node(self, node):
+        current = self.head
+        prev_node = None
+        while current is not node:
+            prev_node = current
+            current = self.head.next
+        return prev_node  
 
 
-    def delete(self):
-        pass
-
-
+# Hash table can't have fewer than this many slots
+MIN_CAPACITY = 8
 class HashTable:
 
     def __init__(self, capacity):
-        self.capacity = [LinkedList()] * capacity
+        self.capacity = [None] * capacity
         self.filled_slots = 0
+        self.new_capacity_length = len(self.capacity) * 2
 
     def get_num_slots(self):
         return len(self.capacity)
 
-
     def get_load_factor(self):
         return self.filled_slots / self.get_num_slots()
-
 
     def fnv1(self, key):
         prime_number = 1099511628211
@@ -59,7 +83,6 @@ class HashTable:
             my_hash = my_hash * prime_number
             my_hash = my_hash ^ ord(char)
         return my_hash
-
 
     def djb2(self, key):
         hash_var = 5381
@@ -74,51 +97,40 @@ class HashTable:
 
     def put(self, key, value):
         if self.capacity[self.hash_index(key)] is None:
-            self.capacity[self.hash_index(key)] = HashTableEntry(key,value)
-            self.filled_slots += 1
-        if self.capacity[self.hash_index(key)] is not None:
-            if self.capacity[self.hash_index(key)].key is key:
-                self.capacity[self.hash_index(key)].value = value
-            if self.capacity[self.hash_index(key)].key is not key:
-                self.capacity[self.hash_index(key)].next = HashTableEntry(key, value)
-
+            self.capacity[self.hash_index(key)] = LinkedList()
+        self.capacity[self.hash_index(key)].upsert(key,value)
+        self.filled_slots += 1
+        if self.get_load_factor() >= .70: 
+            self.resize(len(self.capacity) * 2)
+   
     def delete(self, key):
-        if self.capacity[self.hash_index(key)] is not None:
-            if self.capacity[self.hash_index(key)].key is key and self.capacity[self.hash_index(key)].next is not None:
-                self.capacity[self.hash_index(key)].key = self.capacity[self.hash_index(key)].next.key
-                self.capacity[self.hash_index(key)].value = self.capacity[self.hash_index(key)].next.value
-                self.capacity[self.hash_index(key)].next = self.capacity[self.hash_index(key)].next.next
-
-            elif self.capacity[self.hash_index(key)].key is key and self.capacity[self.hash_index(key)].next is None:
-                self.capacity[self.hash_index(key)] = None
-
-            elif self.capacity[self.hash_index(key)].next is not None:
-                if self.capacity[self.hash_index(key)].next.key == key:
-                    print(self.capacity[self.hash_index(key)].next.key)
-                    self.capacity[self.hash_index(key)].next = None
+        self.capacity[self.hash_index(key)].delete(key)
+        self.filled_slots -= 1
 
     def get(self, key):
-        if self.capacity[self.hash_index(key)] is not None:
-            if self.capacity[self.hash_index(key)].key is key:
-                return self.capacity[self.hash_index(key)].value
-            if self.capacity[self.hash_index(key)].key is not key and self.capacity[self.hash_index(key)].next is not None:
-                if self.capacity[self.hash_index(key)].next.key == key:
-                    return self.capacity[self.hash_index(key)].next.value
+        node_sent_back = self.capacity[self.hash_index(key)].contains(key)
+        if node_sent_back is None:
+            return None 
+        return node_sent_back.value
+
+    def new_hash_index(self, key):
+        # return self.fnv1(key) % len(self.capacity)
+        return self.djb2(key) % self.new_capacity_length
 
     def resize(self, new_capacity):
-        pass
+        temp_capacity = self.capacity
+        self.capacity = [None] * new_capacity
+        for element in temp_capacity:
+            if element is not None:
+                self.put(element.head.key, element.head.value)
+                current = element.head
+                while current.next is not None:
+                    self.put(element.head.next.key,element.head.next.value)
+                    current = current.next
 
 
 if __name__ == "__main__":
     ht = HashTable(8)
-    my_item = HashTableEntry("dyl", "dylan collins")
-    my_item2 = HashTableEntry("dustyn", "dustyn collins")
-    ht.put(my_item.key, my_item.value)
-    ht.put(my_item2.key, my_item2.value)
-    ht.put(my_item.key, "new value")
-    # ht.delete("dyl")
-    # ht.delete("dustyn")
-    print(ht.capacity)
 
     # ht.put("line_1", "'Twas brillig, and the slithy toves")
     # ht.put("line_2", "Did gyre and gimble in the wabe:")
