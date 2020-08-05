@@ -113,10 +113,6 @@ class HashTable:
             return None 
         return node_sent_back.value
 
-    def new_hash_index(self, key):
-        # return self.fnv1(key) % len(self.capacity)
-        return self.djb2(key) % self.new_capacity_length
-
     def resize(self, new_capacity):
         temp_capacity = self.capacity
         self.capacity = [None] * new_capacity
